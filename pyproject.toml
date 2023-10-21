@@ -1,3 +1,16 @@
+[project]
+name = "patreon-discord-linked-role-auth"
+description = "A small web server for integrating Discord and Patreon via Discord's linked roles."
+license = { file = "LICENSE" }
+readme = "README.md"
+requires-python = "3.11"
+version = "0.0.1"
+authors = [{ name = "Sachaa-Thanasius", email = "111999343+Sachaa-Thanasius@users.noreply.github.com" }]
+
+[project.urls]
+Homepage = "https://github.com/Sachaa-Thanasius/patreon-discord-linked-role-auth"
+"Bug Tracker" = "https://github.com/Sachaa-Thanasius/patreon-discord-linked-role-auth/issues"
+
 [tool.black]
 line-length = 120
 target-version = ["py311"]
@@ -67,6 +80,6 @@ typeCheckingMode = "strict"
 useLibraryCodeForTypes = true
 
 reportMissingTypeStubs = "none"
-# reportImportCycles = "warning"
+reportImportCycles = "warning"
 reportPropertyTypeMismatch = "warning"
 reportUnnecessaryTypeIgnoreComment = "warning"

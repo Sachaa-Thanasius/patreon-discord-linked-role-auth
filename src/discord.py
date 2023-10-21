@@ -91,7 +91,7 @@ async def get_oauth_tokens(client: ClientSession, code: str) -> AccessTokenObjec
             raise
         else:
             result = msgspec.json.decode(await response.read(), type=AccessTokenObject)
-            LOGGER.info("get_oauth_tokens result: %s", result)
+            LOGGER.debug("get_oauth_tokens result: %s", result)
             return result
 
 
@@ -136,7 +136,7 @@ async def get_user_data(client: ClientSession, tokens: AccessTokenObject) -> OAu
             raise
         else:
             result = msgspec.json.decode(await response.read(), type=OAuth2UserInfo)
-            LOGGER.info("get_user_data result: %s", result)
+            LOGGER.debug("get_user_data result: %s", result)
             return result
 
 
@@ -182,7 +182,7 @@ async def get_cookie_metadata(client: ClientSession, user_id: str, tokens: Acces
             raise
         else:
             result = msgspec.json.decode(await response.read())
-            LOGGER.info("get_cookie_metadata result: %s", result)
+            LOGGER.debug("get_cookie_metadata result: %s", result)
             return result
 
 
@@ -204,7 +204,7 @@ async def register_metadata_schema(client: ClientSession) -> dict[str, Any]:
             raise
         else:
             result = msgspec.json.decode(await response.read())
-            LOGGER.info("register_metadata_schema result: %s", result)
+            LOGGER.debug("register_metadata_schema result: %s", result)
             return result
 
 
@@ -224,5 +224,5 @@ async def get_metadata_schema(client: ClientSession) -> dict[str, Any]:
             raise
         else:
             result = msgspec.json.decode(await response.read())
-            LOGGER.info("get_metadata_schema result: %s", result)
+            LOGGER.debug("get_metadata_schema result: %s", result)
             return result
