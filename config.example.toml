@@ -1,0 +1,5 @@
+discord_token = ""
+discord_client_id = ""
+discord_client_secret = ""
+discord_redirect_uri = ""
+cookie_secret = ""
