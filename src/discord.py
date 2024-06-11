@@ -3,7 +3,6 @@ from __future__ import annotations
 import datetime
 import logging
 import urllib.parse
-import uuid
 from enum import IntEnum
 from typing import Any
 
@@ -17,9 +16,11 @@ from .structs import AccessTokenObject, OAuth2UserInfo, SchemaField
 
 LOGGER = logging.getLogger(__name__)
 
-BASE_DISCORD_API = "https://discord.com/api/v10"
+DISCORD_BASE_API = "https://discord.com/api/v10"
+DISCORD_AUTH_URL = "https://discord.com/oauth2/authorize"
+DISCORD_TOKEN_URL = f"{DISCORD_BASE_API}/oauth2/token"
 
-DISCORD_AUTH = BasicAuth(CONFIG.discord_client_id, CONFIG.discord_client_secret)
+DISCORD_AUTH = BasicAuth(CONFIG.discord.client_id, CONFIG.discord.client_secret)
 
 
 class RoleConnAttrType(IntEnum):
@@ -33,56 +34,32 @@ class RoleConnAttrType(IntEnum):
     BOOL_NEQ = 8
 
 
-SCHEMA = [
-    SchemaField(
-        key="cookieseaten",
-        name="Cookies Eaten",
-        description="Cookies Eaten Greater Than",
-        type=RoleConnAttrType.NUM_GREAT_THAN,
-    ),
-    SchemaField(
-        key="allergictonuts",
-        name="Allergic To Nuts",
-        description="Is Allergic To Nuts",
-        type=RoleConnAttrType.BOOL_EQ,
-    ),
-    SchemaField(
-        key="bakingsince",
-        name="Baking Since",
-        description="Days since baking their first cookie",
-        type=RoleConnAttrType.DATETIME_GREAT_THAN,
-    ),
-]
-
-
-def get_oauth_url() -> tuple[uuid.UUID, str]:
-    state = uuid.uuid4()
+def prepare_discord_authorization_request(state: bytes) -> str:
     search_params = urllib.parse.urlencode(
         {
-            "client_id": CONFIG.discord_client_id,
-            "redirect_uri": CONFIG.discord_redirect_uri,
+            "client_id": CONFIG.discord.client_id,
+            "redirect_uri": CONFIG.discord.redirect_uri,
             "response_type": "code",
             "state": state,
             "scope": "role_connections.write identify",
             "prompt": "consent",
         },
     )
-    url = f"https://discord.com/oauth2/authorize?{search_params}"
-    return (state, url)
+    url = f"{DISCORD_AUTH_URL}?{search_params}"
+    return url
 
 
-async def get_oauth_tokens(client: ClientSession, code: str) -> AccessTokenObject:
-    url = f"{BASE_DISCORD_API}/oauth2/token"
+async def make_discord_token_request(client: ClientSession, code: str) -> AccessTokenObject:
     data = {
         "grant_type": "authorization_code",
         "code": code,
-        "redirect_uri": CONFIG.discord_redirect_uri,
+        "redirect_uri": CONFIG.discord.redirect_uri,
     }
     headers = {
         "Content-Type": "application/x-www-form-urlencoded",
     }
 
-    async with client.post(url, data=data, headers=headers, auth=DISCORD_AUTH) as response:
+    async with client.post(DISCORD_TOKEN_URL, data=data, headers=headers, auth=DISCORD_AUTH) as response:
         try:
             response.raise_for_status()
         except Exception as err:
@@ -95,9 +72,8 @@ async def get_oauth_tokens(client: ClientSession, code: str) -> AccessTokenObjec
             return result
 
 
-async def get_access_token(client: ClientSession, user_id: str, tokens: AccessTokenObject) -> str:
+async def prepare_discord_refresh_token_request(client: ClientSession, user_id: str, tokens: AccessTokenObject) -> str:
     if tokens.expires_at and (datetime.datetime.now().astimezone() > tokens.expires_at):
-        url = f"{BASE_DISCORD_API}/oauth2/token"
         data = {
             "grant_type": "refresh_token",
             "refresh_token": tokens.refresh_token,
@@ -106,7 +82,7 @@ async def get_access_token(client: ClientSession, user_id: str, tokens: AccessTo
             "Content-Type": "application/x-www-form-urlencoded",
         }
 
-        async with client.post(url, data=data, headers=headers, auth=DISCORD_AUTH) as response:
+        async with client.post(DISCORD_TOKEN_URL, data=data, headers=headers, auth=DISCORD_AUTH) as response:
             try:
                 response.raise_for_status()
             except Exception as err:
@@ -122,7 +98,7 @@ async def get_access_token(client: ClientSession, user_id: str, tokens: AccessTo
 
 
 async def get_user_data(client: ClientSession, tokens: AccessTokenObject) -> OAuth2UserInfo:
-    url = f"{BASE_DISCORD_API}/oauth2/@me"
+    url = f"{DISCORD_BASE_API}/oauth2/@me"
     headers = {
         "Authorization": f"Bearer {tokens.access_token}",
     }
@@ -146,15 +122,15 @@ async def push_metadata(
     tokens: AccessTokenObject,
     metadata: dict[str, Any],
 ) -> None:
-    url = f"{BASE_DISCORD_API}/users/@me/applications/{CONFIG.discord_client_id}/role-connection"
-    access_token = await get_access_token(client, user_id, tokens)
+    url = f"{DISCORD_BASE_API}/users/@me/applications/{CONFIG.discord.client_id}/role-connection"
+    access_token = await prepare_discord_refresh_token_request(client, user_id, tokens)
     data = {
         "platform_name": "Example Linked role Discord Bot",
         "metadata": metadata,
     }
     headers = {
-        "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json",
+        "Authorization": f"Bearer {access_token}",
     }
 
     async with client.put(url, data=msgspec.json.encode(data), headers=headers) as response:
@@ -167,8 +143,8 @@ async def push_metadata(
 
 
 async def get_cookie_metadata(client: ClientSession, user_id: str, tokens: AccessTokenObject) -> dict[str, Any]:
-    url = f"{BASE_DISCORD_API}/users/@me/applications/{CONFIG.discord_client_id}/role-connection"
-    access_token = await get_access_token(client, user_id, tokens)
+    url = f"{DISCORD_BASE_API}/users/@me/applications/{CONFIG.discord.client_id}/role-connection"
+    access_token = await prepare_discord_refresh_token_request(client, user_id, tokens)
     headers = {
         "Authorization": f"Bearer {access_token}",
     }
@@ -187,13 +163,34 @@ async def get_cookie_metadata(client: ClientSession, user_id: str, tokens: Acces
 
 
 async def register_metadata_schema(client: ClientSession) -> dict[str, Any]:
-    url = f"{BASE_DISCORD_API}/applications/{CONFIG.discord_client_id}/role-connections/metadata"
+    schema = [
+        SchemaField(
+            key="cookieseaten",
+            name="Cookies Eaten",
+            description="Cookies Eaten Greater Than",
+            type=RoleConnAttrType.NUM_GREAT_THAN,
+        ),
+        SchemaField(
+            key="allergictonuts",
+            name="Allergic To Nuts",
+            description="Is Allergic To Nuts",
+            type=RoleConnAttrType.BOOL_EQ,
+        ),
+        SchemaField(
+            key="bakingsince",
+            name="Baking Since",
+            description="Days since baking their first cookie",
+            type=RoleConnAttrType.DATETIME_GREAT_THAN,
+        ),
+    ]
+
+    url = f"{DISCORD_BASE_API}/applications/{CONFIG.discord.client_id}/role-connections/metadata"
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bot {CONFIG.discord_token}",
+        "Authorization": f"Bot {CONFIG.discord.token}",
     }
 
-    async with client.put(url, data=msgspec.json.encode(SCHEMA), headers=headers) as response:
+    async with client.put(url, data=msgspec.json.encode(schema), headers=headers) as response:
         try:
             response.raise_for_status()
         except Exception as err:
@@ -209,10 +206,10 @@ async def register_metadata_schema(client: ClientSession) -> dict[str, Any]:
 
 
 async def get_metadata_schema(client: ClientSession) -> dict[str, Any]:
-    url = f"{BASE_DISCORD_API}/applications/{CONFIG.discord_client_id}/role-connections/metadata"
+    url = f"{DISCORD_BASE_API}/applications/{CONFIG.discord.client_id}/role-connections/metadata"
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bot {CONFIG.discord_token}",
+        "Authorization": f"Bot {CONFIG.discord.token}",
     }
 
     async with client.get(url, headers=headers) as response:

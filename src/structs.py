@@ -1,17 +1,29 @@
 from __future__ import annotations
 
 import datetime
-from typing import Self
 
 import msgspec
 
 
+class _DiscordConfig(msgspec.Struct):
+    token: str
+    client_id: str
+    client_secret: str
+    redirect_uri: str
+
+
+class _PatreonConfig(msgspec.Struct):
+    client_id: str
+    client_secret: str
+    creator_access_token: str
+    creator_refresh_token: str
+    redirect_uri: str
+
+
 class Config(msgspec.Struct):
-    discord_token: str
-    discord_client_id: str
-    discord_client_secret: str
-    discord_redirect_uri: str
-    cookie_secret: str
+    cookie_secret: bytes
+    discord: _DiscordConfig
+    patreon: _PatreonConfig
 
 
 class SchemaField(msgspec.Struct):
@@ -23,14 +35,8 @@ class SchemaField(msgspec.Struct):
 
 class AccessTokenObject(msgspec.Struct):
     access_token: str
-    token_type: str
     expires_in: int
     refresh_token: str
-    scope: str
-    expires_at: datetime.datetime | None = None
-
-    def __post_init__(self: Self) -> None:
-        self.expires_at = datetime.datetime.now().astimezone() + datetime.timedelta(seconds=self.expires_in)
 
 
 class _ApplicationInfo(msgspec.Struct):

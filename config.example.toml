@@ -1,5 +1,14 @@
-discord_token = ""
-discord_client_id = ""
-discord_client_secret = ""
-discord_redirect_uri = ""
 cookie_secret = ""
+
+[discord]
+token = ""
+client_id = ""
+client_secret = ""
+redirect_uri = ""
+
+[patreon]
+client_id = ""
+client_secret = ""
+creator_access_token = ""
+creator_refresh_token = ""
+redirect_uri = ""
